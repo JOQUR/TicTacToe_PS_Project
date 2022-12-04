@@ -10,4 +10,10 @@ sudo apt-get install git
 git config --global user.email "your mail"
 git config --global user.name "your name"
 ```
+Then you can download our repo using this command
+```
+git clone https://github.com/JOQUR/TicTacToe_PS_Project.git
+```
+then `cd TicTacToe_PS_Project`.
+If you want to run this project, type `make`, then `./server` and on the other machine `./client <ipaddr>`.
 
