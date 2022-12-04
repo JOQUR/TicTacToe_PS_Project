@@ -60,13 +60,13 @@ main(int argc, char **argv)
         snprintf(buff, sizeof(buff), "%s\n", text);
             if( write(sockfd, buff, strlen(buff))< 0 )
                 fprintf(stderr,"write error : %s\n", strerror(errno));
-
+        
+        fflush(stdout);
+        fgetc(stdin);	
     }
         
 	
 
-	fflush(stdout);
-	fgetc(stdin);	
 	exit(0);
 }
 

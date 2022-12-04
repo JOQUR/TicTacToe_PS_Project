@@ -45,26 +45,34 @@ main(int argc, char **argv)
         fprintf(stderr,"listen error : %s\n", strerror(errno));
         return 1;
     }
-//sleep(3);
+//sleep(3);len = sizeof(cliaddr);
+    fork();
+    if ( (connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &len)) < 0){
+        fprintf(stderr,"accept error : %s\n", strerror(errno));
+        return 1;
+    }
     for ( ; ; ) {
-        len = sizeof(cliaddr);
-            if ( (connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &len)) < 0){
-                fprintf(stderr,"accept error : %s\n", strerror(errno));
-                continue;
-        	}
+        
+        if(fork() == 0)
+            printf("First One\n");
+        else{
+            printf("Second One\n");
+        }
 //sleep(3);
         bzero(str, sizeof(str));
         inet_ntop(AF_INET, (struct sockaddr  *) &cliaddr.sin_addr.s_addr,  str, sizeof(str));
         printf("Connection from %s\n", str);
         while ( (n = read(connfd, recvline, MAXLINE)) > 0) {
-		recvline[n] = 0;	/* null terminate */
-		if (fputs(recvline, stdout) == EOF){
-			fprintf(stderr,"fputs error : %s\n", strerror(errno));
-			return 1;
-		}
-	}
+            recvline[n] = 0;	/* null terminate */
+            if (fputs(recvline, stdout) == EOF){
+                fprintf(stderr,"fputs error : %s\n", strerror(errno));
+                return 1;
+            }
+            
+            
+	    }
         
-}
-        close(connfd);
-	
+        
+    }
+	close(connfd);
 }
