@@ -55,16 +55,15 @@ main(int argc, char **argv)
 		fprintf(stderr,"connect error : %s \n", strerror(errno));
 		return 1;
 	}
-
-	while(1){
-        
+    while(1){
 	    scanf("%s", text);
         snprintf(buff, sizeof(buff), "%s\n", text);
-        if( write(sockfd, buff, strlen(buff))< 0 )
-            fprintf(stderr,"write error : %s\n", strerror(errno));
+            if( write(sockfd, buff, strlen(buff))< 0 )
+                fprintf(stderr,"write error : %s\n", strerror(errno));
 
-        
     }
+        
+	
 
 	fflush(stdout);
 	fgetc(stdin);	
