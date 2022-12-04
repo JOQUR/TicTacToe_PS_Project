@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-I. -lm
 
-OBJECTS = server
+OBJECTS = server client
 
 all: $(OBJECTS)
 
