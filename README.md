@@ -18,6 +18,6 @@ then `cd TicTacToe_PS_Project`.
 If you want to run this project, type `make`, then `./server` and on the other machine `./client <ipaddr>`.
 
 ## TODO
--[ ] Check if connection from second client works
--[ ] Add flags to let only one client save his move
--[ ] Send to clients refreshed gameboard after each move
+- [ ] Check if connection from second client works
+- [ ] Add flags to let only one client save his move
+- [ ] Send to clients refreshed gameboard after each move
