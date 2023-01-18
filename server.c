@@ -1,70 +1,120 @@
-#include        <sys/types.h>   /* basic system data types */
-#include        <sys/socket.h>  /* basic socket definitions */
-#include 		<unistd.h>
-#include        <time.h>                /* old system? */
-#include        <netinet/in.h>  /* sockaddr_in{} and other Internet defns */
-#include        <arpa/inet.h>   /* inet(3) functions */
-#include        <errno.h>
-#include        <stdio.h>
-#include        <stdlib.h>
-#include        <string.h>
+#include<stdio.h>
+#include<string.h>	//strlen
+#include<stdlib.h>	//strlen
+#include<sys/socket.h>
+#include<arpa/inet.h>	//inet_addr
+#include<unistd.h>	//write
+#include<pthread.h> //for threading , link with lpthread
 
-#define MAXLINE 1024
+//the thread function
+void *connection_handler(void *);
 
-//#define SA struct sockaddr
-
-#define LISTENQ 2
-//komentarz
-int
-main(int argc, char **argv)
+int main(int argc , char *argv[])
 {
-
-    int				listenfd, connfd, n;
-    socklen_t			len;
-    char				buff[MAXLINE], str[INET6_ADDRSTRLEN+1];
-    time_t				ticks;
-    struct sockaddr_in	servaddr, cliaddr;
-    char recvline[MAXLINE + 1];
-    if ( (listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-        fprintf(stderr,"socket error : %s\n", strerror(errno));
-        return 1;
-    }
-
-//sleep(3);
-    bzero(&servaddr, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr   = htonl(INADDR_ANY);
-    servaddr.sin_port   = htons(13);	/* daytime server */
-
-    if ( bind( listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0){
-        fprintf(stderr,"bind error : %s\n", strerror(errno));
-        return 1;
-    }
-//sleep(3);
-    if ( listen(listenfd, LISTENQ) < 0){
-        fprintf(stderr,"listen error : %s\n", strerror(errno));
-        return 1;
-    }
-//sleep(3);
-    for ( ; ; ) {
-        len = sizeof(cliaddr);
-            if ( (connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &len)) < 0){
-                fprintf(stderr,"accept error : %s\n", strerror(errno));
-                continue;
-        	}
-//sleep(3);
-        bzero(str, sizeof(str));
-        inet_ntop(AF_INET, (struct sockaddr  *) &cliaddr.sin_addr.s_addr,  str, sizeof(str));
-        printf("Connection from %s\n", str);
-        while ( (n = read(connfd, recvline, MAXLINE)) > 0) {
-		recvline[n] = 0;	/* null terminate */
-		if (fputs(recvline, stdout) == EOF){
-			fprintf(stderr,"fputs error : %s\n", strerror(errno));
+	int socket_desc , client_sock , c , *new_sock;
+	struct sockaddr_in server , client;
+	
+	//Create socket
+	socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+	if (socket_desc == -1)
+	{
+		printf("Could not create socket");
+	}
+	puts("Socket created");
+	
+	//Prepare the sockaddr_in structure
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons( 13 );
+	
+	//Bind
+	if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
+	{
+		//print the error message
+		perror("bind failed. Error");
+		return 1;
+	}
+	puts("bind done");
+	
+	//Listen
+	listen(socket_desc , 3);
+	
+	//Accept and incoming connection
+	puts("Waiting for incoming connections...");
+	c = sizeof(struct sockaddr_in);
+	
+	//Accept and incoming connection
+	puts("Waiting for incoming connections...");
+	c = sizeof(struct sockaddr_in);
+	char strmes[] = "Hello from ID: ";
+	while( (client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)) )
+	{
+		puts("Connection accepted");
+		
+		pthread_t sniffer_thread;
+		new_sock = malloc(1);
+		*new_sock = client_sock;
+		
+		if( pthread_create( &sniffer_thread , NULL ,  connection_handler , (void*) new_sock) < 0)
+		{
+			perror("could not create thread");
 			return 1;
 		}
+		
+		//Now join the thread , so that we dont terminate before the thread
+		//pthread_join( sniffer_thread , NULL);
+		puts("Handler assigned");
+		pthread_t thread_id = pthread_self();
+		sprintf(strmes, "%ld", thread_id);
+		puts(strmes);
 	}
-        
-}
-        close(connfd);
 	
+	if (client_sock < 0)
+	{
+		perror("accept failed");
+		return 1;
+	}
+	
+	return 0;
+}
+
+/*
+ * This will handle connection for each client
+ * */
+void *connection_handler(void *socket_desc)
+{
+	//Get the socket descriptor
+	int sock = *(int*)socket_desc;
+	int read_size;
+	char *message , client_message[2000];
+	
+	//Send some messages to the client
+	message = "Welcome in the TicTacToe Game\n";
+	write(sock , message , strlen(message));
+	
+	message = "Enter your move!\n";
+	write(sock , message , strlen(message));
+	
+	//Receive a message from client
+	while( (read_size = recv(sock , client_message , 2000 , 0)) > 0 )
+	{
+		//Send the message back to client
+		write(sock , client_message , strlen(client_message));
+		puts(client_message);
+	}
+	
+	if(read_size == 0)
+	{
+		puts("Client disconnected");
+		fflush(stdout);
+	}
+	else if(read_size == -1)
+	{
+		perror("recv failed");
+	}
+		
+	//Free the socket pointer
+	free(socket_desc);
+	
+	return 0;
 }

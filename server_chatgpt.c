@@ -1,208 +1,148 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <poll.h>
+#include<stdio.h>
+#include<string.h>	//strlen
+#include<stdlib.h>	//strlen
+#include<sys/socket.h>
+#include<arpa/inet.h>	//inet_addr
+#include<unistd.h>	//write
+#include<pthread.h> //for threading , link with lpthread
 
-#define PORT "9034"   // Port we're listening on
+//the thread function
+void *connection_handler(void *);
 
-// Get sockaddr, IPv4 or IPv6:
-void *get_in_addr(struct sockaddr *sa)
-{
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
+int check_win(char game_board[]) {
+    // check rows
+    for (int i = 0; i < 9; i += 3) {
+        if (game_board[i] != ' ' && game_board[i] == game_board[i + 1] && game_board[i] == game_board[i + 2]) {
+            return 1;
+        }
     }
-
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+    // check columns
+    for (int i = 0; i < 3; i++) {
+        if (game_board[i] != ' ' && game_board[i] == game_board[i + 3] && game_board[i] == game_board[i + 6]) {
+            return 1;
+        }
+    }
+    // check diagonals
+    if (game_board[0] != ' ' && game_board[0] == game_board[4] && game_board[0] == game_board[8]) {
+        return 1;
+    }
+    if (game_board[2] != ' ' && game_board[2] == game_board[4] && game_board[2] == game_board[6]) {
+        return 1;
+    }
+    return 0;
 }
 
-// Return a listening socket
-int get_listener_socket(void)
-{
-    int listener;     // Listening socket descriptor
-    int yes=1;        // For setsockopt() SO_REUSEADDR, below
-    int rv;
-
-    struct addrinfo hints, *ai, *p;
-
-    // Get us a socket and bind it
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-    if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0) {
-        fprintf(stderr, "selectserver: %s\n", gai_strerror(rv));
-        exit(1);
+int check_draw(char game_board[]) {
+    for (int i = 0; i < 9; i++) {
+        if (game_board[i] == ' ') {
+            return 0;
+        }
     }
-    
-    for(p = ai; p != NULL; p = p->ai_next) {
-        listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (listener < 0) { 
+    return 1;
+}
+
+
+int main(int argc , char *argv[])
+{
+	int socket_desc , client_sock , c , *new_sock;
+	struct sockaddr_in server , client;
+	
+	//Create socket
+	socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+	if (socket_desc == -1)
+	{
+		printf("Could not create socket");
+	}
+	puts("Socket created");
+	
+	//Prepare the sockaddr_in structure
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons( 8888 );
+	
+	//Bind
+	if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
+	{
+		//print the error message
+		perror("bind failed. Error");
+		return 1;
+	}
+	puts("bind done");
+	
+	//Listen
+	listen(socket_desc , 3);
+	
+	//Accept and incoming connection
+	puts("Waiting for incoming connections...");
+	c = sizeof(struct sockaddr_in);
+	
+	
+	//Accept and incoming connection
+	puts("Waiting for incoming connections...");
+	c = sizeof(struct sockaddr_in);
+	while( (client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)) )
+	{
+		puts("Connection accepted");
+		
+		pthread_t sniffer_thread;
+		new_sock = malloc(1);
+		*new_sock = client_sock;
+		
+		if( pthread_create( &sniffer_thread , NULL ,  connection_handler , (void*) new_sock) < 0)
+		{
+			perror("could not create thread");
+			return 1;
+		}
+		
+		//Now join the thread , so that we dont terminate before the thread
+		//pthread_join( sniffer_thread , NULL);
+		puts("Handler assigned");
+	}
+	
+	if (client_sock < 0)
+	{
+		perror("accept failed");
+		return 1;
+	}
+	
+	return 0;
+}
+
+/*
+ * This will handle connection for each client
+ * */
+void *connection_handler(void* socket_desc) {
+    int sock = (int)socket_desc;
+    char client_message[2000], game_board[9] = {' ',' ',' ',' ',' ',' ',' ',' ',' '};
+    int read_size, player = 1;
+    // Send a message to the client to start the game
+    write(sock, "Welcome to Tic-Tac-Toe! You are player 1.\n", strlen("Welcome to Tic-Tac-Toe! You are player 1.\n"));
+    while(1) {
+        // Receive a move from the client
+        read_size = recv(sock , client_message , 2000 , 0);
+        if(read_size <= 0) {
+            puts("Client disconnected");
+            break;
+        }
+        int move = atoi(client_message);
+        if (move < 0 || move > 8 || game_board[move] != ' ') {
+            write(sock, "Invalid move, try again\n", strlen("Invalid move, try again\n"));
             continue;
         }
-        
-        // Lose the pesky "address already in use" error message
-        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-
-        if (bind(listener, p->ai_addr, p->ai_addrlen) < 0) {
-            close(listener);
-            continue;
+        game_board[move] = player == 1 ? 'X' : 'O';
+        // Send the updated game board to the client
+        write(sock , game_board , sizeof(game_board));
+        if (check_win(game_board)) {
+            char* win_message = player == 1 ? "Player 1 wins!\n" : "Player 2 wins!\n";
+            write(sock, win_message, strlen(win_message));
+            break;
         }
-
-        break;
-    }
-
-    freeaddrinfo(ai); // All done with this
-
-    // If we got here, it means we didn't get bound
-    if (p == NULL) {
-        return -1;
-    }
-
-    // Listen
-    if (listen(listener, 10) == -1) {
-        return -1;
-    }
-
-    return listener;
-}
-
-// Add a new file descriptor to the set
-void add_to_pfds(struct pollfd *pfds[], int newfd, int *fd_count, int *fd_size)
-{
-    // If we don't have room, add more space in the pfds array
-    if (*fd_count == *fd_size) {
-        *fd_size *= 2; // Double it
-
-        *pfds = realloc(*pfds, sizeof(**pfds) * (*fd_size));
-    }
-
-    (*pfds)[*fd_count].fd = newfd;
-    (*pfds)[*fd_count].events = POLLIN; // Check ready-to-read
-
-    (*fd_count)++;
-}
-
-// Remove an index from the set
-void del_from_pfds(struct pollfd pfds[], int i, int *fd_count)
-{
-    // Copy the one from the end over this one
-    pfds[i] = pfds[*fd_count-1];
-
-    (*fd_count)--;
-}
-
-// Main
-int main(void)
-{
-    int listener;     // Listening socket descriptor
-
-    int newfd;        // Newly accept()ed socket descriptor
-    struct sockaddr_storage remoteaddr; // Client address
-    socklen_t addrlen;
-
-    char buf[256];    // Buffer for client data
-
-    char remoteIP[INET6_ADDRSTRLEN];
-
-    // Start off with room for 5 connections
-    // (We'll realloc as necessary)
-    int fd_count = 0;
-    int fd_size = 5;
-    struct pollfd *pfds = malloc(sizeof *pfds * fd_size);
-
-    // Set up and get a listening socket
-    listener = get_listener_socket();
-
-    if (listener == -1) {
-        fprintf(stderr, "error getting listening socket\n");
-        exit(1);
-    }
-
-    // Add the listener to set
-    pfds[0].fd = listener;
-    pfds[0].events = POLLIN; // Report ready to read on incoming connection
-
-    fd_count = 1; // For the listener
-
-    // Main loop
-    for(;;) {
-        int poll_count = poll(pfds, fd_count, -1);
-
-        if (poll_count == -1) {
-            perror("poll");
-            exit(1);
+        if (check_draw(game_board)) {
+            write(sock, "It's a draw!\n", strlen("It's a draw!\n"));
+            break;
         }
-
-        // Run through the existing connections looking for data to read
-        for(int i = 0; i < fd_count; i++) {
-
-            // Check if someone's ready to read
-            if (pfds[i].revents & POLLIN) { // We got one!!
-
-                if (pfds[i].fd == listener) {
-                    // If listener is ready to read, handle new connection
-
-                    addrlen = sizeof remoteaddr;
-                    newfd = accept(listener,
-                        (struct sockaddr *)&remoteaddr,
-                        &addrlen);
-
-                    if (newfd == -1) {
-                        perror("accept");
-                    } else {
-                        add_to_pfds(&pfds, newfd, &fd_count, &fd_size);
-
-                        printf("pollserver: new connection from %s on "
-                            "socket %d\n",
-                            inet_ntop(remoteaddr.ss_family,
-                                get_in_addr((struct sockaddr*)&remoteaddr),
-                                remoteIP, INET6_ADDRSTRLEN),
-                            newfd);
-                    }
-                } else {
-                    // If not the listener, we're just a regular client
-                    int nbytes = recv(pfds[i].fd, buf, sizeof buf, 0);
-
-                    int sender_fd = pfds[i].fd;
-
-                    if (nbytes <= 0) {
-                        // Got error or connection closed by client
-                        if (nbytes == 0) {
-                            // Connection closed
-                            printf("pollserver: socket %d hung up\n", sender_fd);
-                        } else {
-                            perror("recv");
-                        }
-
-                        close(pfds[i].fd); // Bye!
-
-                        del_from_pfds(pfds, i, &fd_count);
-
-                    } else {
-                        // We got some good data from a client
-
-                        for(int j = 0; j < fd_count; j++) {
-                            // Send to everyone!
-                            int dest_fd = pfds[j].fd;
-
-                            // Except the listener and ourselves
-                            if (dest_fd != listener && dest_fd != sender_fd) {
-                                if (send(dest_fd, buf, nbytes, 0) == -1) {
-                                    perror("send");
-                                }
-                            }
-                        }
-                    }
-                } // END handle data from client
-            } // END got ready-to-read from poll()
-        } // END looping through file descriptors
-    } // END for(;;)--and you thought it would never end!
-    
+        player = player == 1 ? 2 : 1;
+    }
+    free(socket_desc);
     return 0;
 }
