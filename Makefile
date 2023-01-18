@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-I. -lm
 
-OBJECTS = server client
+OBJECTS = server client server_chatgpt
 
 all: $(OBJECTS)
 
