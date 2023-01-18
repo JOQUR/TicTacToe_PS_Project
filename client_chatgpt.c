@@ -34,7 +34,7 @@ int main(int argc , char argv[])
     //keep communicating with server
     while(1)
     {
-        printf("Enter message : ");
+        printf("Enter move: ");
         scanf("%s" , message);
 
         //Send some data
