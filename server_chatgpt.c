@@ -48,7 +48,7 @@ void send_board(int sock) {
 void *connection_handler(void* socket_desc) {
     int sock = *(int*)socket_desc;
     int read_size, move;
-    char player = (client_count == 0) ? 'X' : 'O';
+    char player = (client_count == 1) ? 'X' : 'O';
     char message[2000];
 
     // send initial game board
