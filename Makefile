@@ -1,13 +1,13 @@
 CC=gcc
 CFLAGS=-I. -lm
 
-OBJECTS = server client server_chatgpt
+OBJECTS = server_working client_working
 
 all: $(OBJECTS)
 
 $(OBJECTS):%:%.c
 	@echo Compiling $<  to  $@
-	$(CC) -o $@ $< $(CFLAGS)
+	$(CC) -pthread -o $@ $< $(CFLAGS)
 
 	
 clean:

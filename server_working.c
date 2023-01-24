@@ -13,7 +13,7 @@
 char board[BOARD_SIZE];
 
 int client_count = 0;
-pthread_mutex_t lock;
+pthread_mutex_t lock, lock2;
 char message[2000];
 
 // check for win
@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
 
     // initialize mutex
     pthread_mutex_init(&lock, NULL);
+    pthread_mutex_init(&lock2, NULL);
 
     // Create socket
     socket_desc = socket(AF_INET, SOCK_STREAM, 0);
@@ -140,17 +141,14 @@ int main(int argc, char *argv[]) {
         new_sock = malloc(1);
         *new_sock = client_sock;
 
-        pthread_mutex_lock(&lock);
         if (client_count >= MAX_CLIENTS) {
             sprintf(message, "Server is full.\n");
             write(client_sock, message, strlen(message));
             close(client_sock);
-            pthread_mutex_unlock(&lock);
             continue;
         }
         client_count++;
-        pthread_mutex_unlock(&lock);
-
+        
         if (pthread_create(&sniffer_thread, NULL, connection_handler, (void *)new_sock) < 0) {
             perror("could not create thread");
             return 1;
@@ -166,6 +164,7 @@ int main(int argc, char *argv[]) {
 
     // destroy mutex
     pthread_mutex_destroy(&lock);
+    pthread_mutex_destroy(&lock2);
 
     return 0;
 }
