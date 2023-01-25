@@ -4,10 +4,11 @@
 #include <arpa/inet.h>  // inet_addr
 #include <unistd.h>    // close
 
-int main(int argc, char argv[]) {
+int main(int argc, char **argv) {
     int sock;
     struct sockaddr_in server;
     char move[10], server_reply[2000];
+    printf("Adress: %s\n", argv[1]);
 
     // Create socket
     sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -16,7 +17,7 @@ int main(int argc, char argv[]) {
     }
     puts("Socket created");
 
-    server.sin_addr.s_addr = inet_addr("192.168.56.31");
+    server.sin_addr.s_addr = inet_addr(argv[1]);
     server.sin_family = AF_INET;
     server.sin_port = htons(8888);
 
